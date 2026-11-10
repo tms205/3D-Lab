@@ -1,0 +1,80 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --color-gold: 229, 169, 60;
+    --color-dark: 20, 13, 7;
+  }
+
+  /* Custom smooth scrollbar */
+  ::-webkit-scrollbar {
+    width: 8px;
+  }
+  ::-webkit-scrollbar-track {
+    background: #140d07;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #3f2c20;
+    border-radius: 4px;
+    border: 1px solid rgba(229, 169, 60, 0.2);
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #e5a93c;
+  }
+}
+
+/* Glassmorphism & Visual Aesthetics */
+.glass-panel {
+  background: rgba(31, 21, 14, 0.7);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(229, 169, 60, 0.18);
+}
+
+.glass-panel-gold {
+  background: linear-gradient(135deg, rgba(229, 169, 60, 0.12) 0%, rgba(31, 21, 14, 0.8) 100%);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(229, 169, 60, 0.35);
+  box-shadow: 0 10px 30px -10px rgba(229, 169, 60, 0.15);
+}
+
+.gold-gradient-text {
+  background: linear-gradient(135deg, #FFE8B6 0%, #E5A93C 50%, #B87B1D 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.gold-border-glow {
+  box-shadow: 0 0 20px rgba(229, 169, 60, 0.2), inset 0 0 10px rgba(229, 169, 60, 0.1);
+}
+
+.gold-glow-hover {
+  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.gold-glow-hover:hover {
+  box-shadow: 0 0 35px rgba(229, 169, 60, 0.35);
+  border-color: rgba(229, 169, 60, 0.6);
+  transform: translateY(-2px);
+}
+
+/* 3D Perspective Card effect */
+.perspective-1000 {
+  perspective: 1000px;
+}
+.transform-style-3d {
+  transform-style: preserve-3d;
+}
+
+/* Radial dark gradient for hero backgrounds */
+.hero-radial-bg {
+  background: radial-gradient(circle at 50% 40%, rgba(77, 43, 21, 0.4) 0%, rgba(20, 13, 7, 0.95) 75%, #140d07 100%);
+}
+
+.lab-grid-bg {
+  background-image: 
+    linear-gradient(to right, rgba(229, 169, 60, 0.05) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(229, 169, 60, 0.05) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
