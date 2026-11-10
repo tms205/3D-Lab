@@ -2,7 +2,7 @@
 > **Dự án Nhóm 1: Pía Lab** — Chuyển đổi thiết kế Figma thành Website 3D Tương tác thời gian thực đạt tiêu chuẩn Creative Web.
 
 ---
-
+Link xem dự án: https://3-d-bo6plem4i-tms-afb9.vercel.app/
 ## 🌟 TỔNG QUAN DỰ ÁN
 
 **Pía Lab** là trải nghiệm website kết hợp giữa **di sản văn hóa bánh Pía Sóc Trăng hơn 100 năm** (làng nghề Vũng Thơm) và **phòng thí nghiệm ẩm thực đương đại**. 
