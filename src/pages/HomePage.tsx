@@ -23,7 +23,9 @@ export function HomePage({ onNavigate, onAddToCart, onQuickView }: HomePageProps
   // Hero 3D interactive controls
   const [heroCutaway, setHeroCutaway] = useState(false);
   const [heroExploded, setHeroExploded] = useState(false);
+  const [separationFactor, setSeparationFactor] = useState(1.5);
   const [selectedHeroFlavor, setSelectedHeroFlavor] = useState<'gold' | 'durian' | 'taro' | 'matcha'>('gold');
+  const [cakeStyle, setCakeStyle] = useState<'pia' | 'traditional'>('pia');
 
   const heroFlavors = {
     gold: {
@@ -161,7 +163,7 @@ export function HomePage({ onNavigate, onAddToCart, onQuickView }: HomePageProps
                   {/* Real-time 3D Scene */}
                   <PiaCanvas
                     className="w-full h-full min-h-[380px] sm:min-h-[460px]"
-                    cameraPosition={[0, 1.4, 4.2]}
+                    cameraPosition={[0, 1.4, 4.4]}
                     fov={44}
                   >
                     <RealisticPiaCake
@@ -169,21 +171,105 @@ export function HomePage({ onNavigate, onAddToCart, onQuickView }: HomePageProps
                       fillingColor={currentFlavor.filling}
                       coreColor={currentFlavor.core}
                       stampText={currentFlavor.stamp}
+                      cakeType={cakeStyle}
                       isCutaway={heroCutaway}
                       isExploded={heroExploded}
-                      scale={1.12}
+                      separationFactor={separationFactor}
+                      scale={heroExploded ? 0.88 : 1.12}
                     />
                     <MoonAtmosphere position={[4.2, 3.8, -6]} size={1.8} />
                     <FloatingLanterns />
                     <ParticleDust count={60} color="#F7CE78" spread={7} speed={0.25} />
                   </PiaCanvas>
 
+                  {/* Vertical Drag Scrubber (Khi Tách Lớp 3D: Kéo lên/xuống để điều chỉnh khoảng cách tầng) */}
+                  {heroExploded && (
+                    <motion.div
+                      initial={{ opacity: 0, x: -16 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: -16 }}
+                      className="absolute left-3 top-1/2 -translate-y-1/2 z-20 flex flex-col items-center gap-2 px-2.5 py-3 rounded-2xl bg-pia-dark/90 backdrop-blur-md border border-pia-gold/40 shadow-2xl select-none"
+                    >
+                      <div className="flex items-center gap-1 text-[10px] font-bold text-pia-gold uppercase tracking-wider">
+                        <span>↕ Dãn tầng</span>
+                      </div>
+
+                      {/* Nút tăng dãn */}
+                      <button
+                        onClick={() => setSeparationFactor((prev) => Math.min(2.4, +(prev + 0.2).toFixed(2)))}
+                        className="w-7 h-7 rounded-lg bg-pia-surface hover:bg-pia-gold hover:text-pia-dark border border-pia-gold/30 text-pia-gold text-sm font-bold flex items-center justify-center transition-all shadow-sm"
+                        title="Dãn xa hơn"
+                      >
+                        +
+                      </button>
+
+                      {/* Thanh kéo Slider dọc tương tác trực tiếp bằng chuột */}
+                      <div className="relative w-3 h-32 bg-pia-surface/90 rounded-full border border-pia-gold/30 flex items-end p-0.5 cursor-ns-resize">
+                        <div
+                          className="w-full bg-gradient-to-t from-pia-gold via-amber-400 to-amber-200 rounded-full transition-all duration-75 shadow-sm"
+                          style={{
+                            height: `${Math.round(((separationFactor - 0.6) / (2.4 - 0.6)) * 100)}%`,
+                          }}
+                        />
+                        <input
+                          type="range"
+                          min="0.6"
+                          max="2.4"
+                          step="0.05"
+                          value={separationFactor}
+                          onChange={(e) => setSeparationFactor(parseFloat(e.target.value))}
+                          className="absolute inset-0 opacity-0 cursor-ns-resize h-full w-full"
+                          style={{ WebkitAppearance: 'slider-vertical' } as React.CSSProperties}
+                          title="Click & kéo chuột lên/xuống để dãn khoảng cách các tầng"
+                        />
+                      </div>
+
+                      {/* Nút giảm dãn */}
+                      <button
+                        onClick={() => setSeparationFactor((prev) => Math.max(0.6, +(prev - 0.2).toFixed(2)))}
+                        className="w-7 h-7 rounded-lg bg-pia-surface hover:bg-pia-gold hover:text-pia-dark border border-pia-gold/30 text-pia-gold text-sm font-bold flex items-center justify-center transition-all shadow-sm"
+                        title="Thu gần lại"
+                      >
+                        -
+                      </button>
+
+                      <span className="text-[10px] font-mono font-bold text-pia-goldLight">
+                        {Math.round(separationFactor * 100)}%
+                      </span>
+                    </motion.div>
+                  )}
+
                   {/* 3D Real-time Control Controls Bar Overlay */}
                   <div className="absolute top-4 right-4 z-20 flex flex-col gap-2">
+                    {/* Style Switcher: Bánh Pía vs Bánh Nướng */}
+                    <div className="flex rounded-xl bg-pia-dark/85 backdrop-blur-md border border-pia-gold/30 p-0.5 shadow-md">
+                      <button
+                        onClick={() => setCakeStyle('pia')}
+                        className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-all ${
+                          cakeStyle === 'pia'
+                            ? 'bg-pia-gold text-pia-dark shadow-sm'
+                            : 'text-pia-muted hover:text-pia-cream'
+                        }`}
+                      >
+                        Bánh Pía
+                      </button>
+                      <button
+                        onClick={() => setCakeStyle('traditional')}
+                        className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-all ${
+                          cakeStyle === 'traditional'
+                            ? 'bg-pia-gold text-pia-dark shadow-sm'
+                            : 'text-pia-muted hover:text-pia-cream'
+                        }`}
+                      >
+                        Bánh Nướng
+                      </button>
+                    </div>
+
                     <button
                       onClick={() => {
-                        setHeroCutaway(!heroCutaway);
-                        if (heroExploded) setHeroExploded(false);
+                        const next = !heroCutaway;
+                        setHeroCutaway(next);
+                        if (next) setHeroExploded(false);
                       }}
                       className={`px-3 py-1.5 rounded-xl text-xs font-semibold backdrop-blur-md transition-all duration-300 flex items-center gap-1.5 border ${
                         heroCutaway
@@ -192,13 +278,14 @@ export function HomePage({ onNavigate, onAddToCart, onQuickView }: HomePageProps
                       }`}
                     >
                       <Eye className="w-3.5 h-3.5" />
-                      <span>{heroCutaway ? 'Đóng Lát Cắt' : 'Bổ Đôi 3D'}</span>
+                      <span>{heroCutaway ? 'Xem Nguyên Bánh' : 'Bổ Đôi 3D'}</span>
                     </button>
 
                     <button
                       onClick={() => {
-                        if (!heroCutaway) setHeroCutaway(true);
-                        setHeroExploded(!heroExploded);
+                        const next = !heroExploded;
+                        setHeroExploded(next);
+                        if (next) setHeroCutaway(false);
                       }}
                       className={`px-3 py-1.5 rounded-xl text-xs font-semibold backdrop-blur-md transition-all duration-300 flex items-center gap-1.5 border ${
                         heroExploded
@@ -207,7 +294,7 @@ export function HomePage({ onNavigate, onAddToCart, onQuickView }: HomePageProps
                       }`}
                     >
                       <Layers className="w-3.5 h-3.5" />
-                      <span>{heroExploded ? 'Gom Vi Tầng' : 'Tách Lớp 3D'}</span>
+                      <span>{heroExploded ? 'Gom Bánh Lại' : 'Tách Lớp 3D'}</span>
                     </button>
                   </div>
 

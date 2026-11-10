@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { motion } from 'framer-motion';
 import confetti from 'canvas-confetti';
 import { Sparkles, Eye, Layers, ShoppingBag, RotateCcw, Check, ShieldCheck, Info } from 'lucide-react';
 import { PageRoute, Product, CartItem } from '@/types';
@@ -7,8 +8,9 @@ import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { PiaCanvas } from '@/components/three/PiaCanvas';
 import { DiyCakeBuilder3D } from '@/components/three/DiyCakeBuilder3D';
-import { MoonAtmosphere } from '@/components/three/MoonAtmosphere';
 import { FloatingLanterns } from '@/components/three/FloatingLanterns';
+import { MoonAtmosphere } from '@/components/three/MoonAtmosphere';
+import { ParticleDust } from '@/components/three/ParticleDust';
 import { formatVND } from '@/utils/cn';
 
 interface DiyLabPageProps {
@@ -26,6 +28,7 @@ export function DiyLabPage({ onAddCustomToCart, onNavigate }: DiyLabPageProps) {
   // 3D Visual toggles
   const [isCutaway, setIsCutaway] = useState(true);
   const [isExploded, setIsExploded] = useState(false);
+  const [separationFactor, setSeparationFactor] = useState(1.5);
   const [showRecipeModal, setShowRecipeModal] = useState(false);
 
   // Active step tab in accordion: 'crust' | 'filling' | 'core' | 'stamp'
@@ -109,7 +112,7 @@ export function DiyLabPage({ onAddCustomToCart, onNavigate }: DiyLabPageProps) {
 
   return (
     <div className="min-h-screen pt-24 pb-20">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="max-w-[92rem] mx-auto px-4 sm:px-6 lg:px-8">
         
         {/* Header */}
         <div className="text-center max-w-3xl mx-auto mb-8">
@@ -125,19 +128,20 @@ export function DiyLabPage({ onAddCustomToCart, onNavigate }: DiyLabPageProps) {
         </div>
 
         {/* Workbench Layout: 3D Scene on Left, Customizer Options on Right */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,2fr)_minmax(24rem,1fr)] gap-8 items-start">
           
           {/* ========================================================
               3D WORKBENCH VIEWPORT (Left Column)
           ======================================================== */}
-          <div className="lg:col-span-7 sticky top-24">
-            <div className="relative w-full aspect-[4/3] sm:aspect-square max-h-[580px] rounded-3xl glass-panel-gold border border-pia-gold/40 p-2 shadow-2xl overflow-hidden group">
+          <div className="lg:sticky lg:top-24">
+            <div className="relative w-full aspect-[40/39] sm:aspect-square max-h-[754px] rounded-3xl glass-panel-gold border border-pia-gold/40 p-2 shadow-2xl overflow-hidden group">
               
               {/* 3D Canvas Scene */}
               <PiaCanvas
-                className="w-full h-full min-h-[360px]"
+                className="w-full h-full"
                 cameraPosition={[0, 1.8, 4.4]}
-                fov={42}
+                fov={46}
+                showShadows={false}
               >
                 <DiyCakeBuilder3D
                   crustColor={selectedCrust.color}
@@ -146,17 +150,76 @@ export function DiyLabPage({ onAddCustomToCart, onNavigate }: DiyLabPageProps) {
                   stampText={selectedStamp.text.split(' ')[0] || '福'}
                   isCutaway={isCutaway}
                   isExploded={isExploded}
+                  separationFactor={separationFactor}
                 />
-                <MoonAtmosphere position={[4.0, 3.5, -6]} size={1.6} />
-                <FloatingLanterns />
+                <MoonAtmosphere position={[0.35, 0.45, -5]} size={0.9} />
+                <group position={[0, -1.1, -2]} scale={0.55}>
+                  <FloatingLanterns />
+                </group>
+                <ParticleDust count={65} color="#F7CE78" spread={7.5} speed={0.2} />
               </PiaCanvas>
+
+              {/* Vertical Drag Scrubber (Khi Tách Lớp 3D) */}
+              {isExploded && (
+                <motion.div
+                  initial={{ opacity: 0, x: -16 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -16 }}
+                  className="absolute left-3 top-1/2 -translate-y-1/2 z-20 flex flex-col items-center gap-2 px-2.5 py-3 rounded-2xl bg-pia-dark/90 backdrop-blur-md border border-pia-gold/40 shadow-2xl select-none"
+                >
+                  <div className="flex items-center gap-1 text-[10px] font-bold text-pia-gold uppercase tracking-wider">
+                    <span>↕ Dãn tầng</span>
+                  </div>
+
+                  <button
+                    onClick={() => setSeparationFactor((prev) => Math.min(2.4, +(prev + 0.2).toFixed(2)))}
+                    className="w-7 h-7 rounded-lg bg-pia-surface hover:bg-pia-gold hover:text-pia-dark border border-pia-gold/30 text-pia-gold text-sm font-bold flex items-center justify-center transition-all shadow-sm"
+                    title="Dãn xa hơn"
+                  >
+                    +
+                  </button>
+
+                  <div className="relative w-3 h-32 bg-pia-surface/90 rounded-full border border-pia-gold/30 flex items-end p-0.5 cursor-ns-resize">
+                    <div
+                      className="w-full bg-gradient-to-t from-pia-gold via-amber-400 to-amber-200 rounded-full transition-all duration-75 shadow-sm"
+                      style={{
+                        height: `${Math.round(((separationFactor - 0.6) / (2.4 - 0.6)) * 100)}%`,
+                      }}
+                    />
+                    <input
+                      type="range"
+                      min="0.6"
+                      max="2.4"
+                      step="0.05"
+                      value={separationFactor}
+                      onChange={(e) => setSeparationFactor(parseFloat(e.target.value))}
+                      className="absolute inset-0 opacity-0 cursor-ns-resize h-full w-full"
+                      style={{ WebkitAppearance: 'slider-vertical' } as React.CSSProperties}
+                      title="Click & kéo chuột lên/xuống để dãn khoảng cách các tầng"
+                    />
+                  </div>
+
+                  <button
+                    onClick={() => setSeparationFactor((prev) => Math.max(0.6, +(prev - 0.2).toFixed(2)))}
+                    className="w-7 h-7 rounded-lg bg-pia-surface hover:bg-pia-gold hover:text-pia-dark border border-pia-gold/30 text-pia-gold text-sm font-bold flex items-center justify-center transition-all shadow-sm"
+                    title="Thu gần lại"
+                  >
+                    -
+                  </button>
+
+                  <span className="text-[10px] font-mono font-bold text-pia-goldLight">
+                    {Math.round(separationFactor * 100)}%
+                  </span>
+                </motion.div>
+              )}
 
               {/* 3D Visual Modes Action Bar Overlay */}
               <div className="absolute top-4 left-4 z-20 flex flex-wrap gap-2">
                 <button
                   onClick={() => {
-                    setIsCutaway(!isCutaway);
-                    if (isExploded) setIsExploded(false);
+                    const next = !isCutaway;
+                    setIsCutaway(next);
+                    if (next) setIsExploded(false);
                   }}
                   className={`px-3 py-1.5 rounded-xl text-xs font-semibold backdrop-blur-md transition-all flex items-center gap-1.5 border shadow-md ${
                     isCutaway
@@ -170,8 +233,9 @@ export function DiyLabPage({ onAddCustomToCart, onNavigate }: DiyLabPageProps) {
 
                 <button
                   onClick={() => {
-                    if (!isCutaway) setIsCutaway(true);
-                    setIsExploded(!isExploded);
+                    const next = !isExploded;
+                    setIsExploded(next);
+                    if (next) setIsCutaway(false);
                   }}
                   className={`px-3 py-1.5 rounded-xl text-xs font-semibold backdrop-blur-md transition-all flex items-center gap-1.5 border shadow-md ${
                     isExploded
@@ -180,7 +244,7 @@ export function DiyLabPage({ onAddCustomToCart, onNavigate }: DiyLabPageProps) {
                   }`}
                 >
                   <Layers className="w-3.5 h-3.5" />
-                  <span>{isExploded ? 'Gom Vi Tầng' : 'Tách Lớp 3D'}</span>
+                  <span>{isExploded ? 'Gom Bánh Lại' : 'Tách Lớp 3D'}</span>
                 </button>
               </div>
 
@@ -217,7 +281,7 @@ export function DiyLabPage({ onAddCustomToCart, onNavigate }: DiyLabPageProps) {
           {/* ========================================================
               CUSTOMIZER CONTROL PANEL (Right Column)
           ======================================================== */}
-          <div className="lg:col-span-5 space-y-5">
+          <div className="space-y-5">
             
             {/* Step 1: Chọn Vỏ Bánh */}
             <div className="rounded-3xl glass-panel p-5 border border-pia-border hover:border-pia-gold/40 transition-all">

@@ -208,6 +208,7 @@ export function App() {
                   fillingColor={quickViewProduct.layers.filling.color}
                   coreColor={quickViewProduct.layers.core.color}
                   stampText={quickViewProduct.layers.stamp.charAt(quickViewProduct.layers.stamp.indexOf('"') + 1) || '福'}
+                  cakeType={quickViewProduct.category === 'hop-qua-trung-thu' ? 'traditional' : 'pia'}
                   isCutaway={quickCutaway}
                   scale={1.2}
                 />

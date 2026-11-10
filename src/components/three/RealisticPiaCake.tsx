@@ -1,14 +1,21 @@
 import { useRef, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
+import { Html } from '@react-three/drei';
 import * as THREE from 'three';
+import {
+  getArtisanStampTexture,
+  getTraditionalEmbossTexture,
+} from '@/utils/cakeTextures';
 
 export interface PiaCakeProps {
   crustColor?: string;
   fillingColor?: string;
   coreColor?: string;
   stampText?: string;
+  cakeType?: 'pia' | 'traditional';
   isCutaway?: boolean;
   isExploded?: boolean;
+  separationFactor?: number;
   scale?: number;
   autoRotate?: boolean;
   interactive?: boolean;
@@ -17,303 +24,442 @@ export interface PiaCakeProps {
 
 export function RealisticPiaCake({
   crustColor = '#E5A93C',
-  fillingColor = '#D4AC0D',
-  coreColor = '#FF6F00',
+  fillingColor = '#E0A82E',
+  coreColor = '#FF5722',
   stampText = '福',
+  cakeType = 'pia',
   isCutaway = false,
   isExploded = false,
+  separationFactor = 1.5,
   scale = 1.0,
   autoRotate = true,
   interactive = true,
   onHover,
 }: PiaCakeProps) {
-  const cakeGroupRef = useRef<THREE.Group>(null);
-  const coreRef = useRef<THREE.Mesh>(null);
+  const rootGroupRef = useRef<THREE.Group>(null);
+
+  // 4 Exploded View Tier Refs (Từ trên xuống dưới theo đúng yêu cầu)
+  const tier1WireframeRef = useRef<THREE.Group>(null); // Tầng 1: Lưới toàn bánh
+  const tier2CrustRef = useRef<THREE.Group>(null);     // Tầng 2: Vỏ bánh
+  const tier3PasteRef = useRef<THREE.Group>(null);     // Tầng 3: Thịt bánh
+  const tier4CoreRef = useRef<THREE.Group>(null);      // Tầng 4: Nhân bánh
+
   const pointerTarget = useRef({ x: 0, y: 0 });
+  const sep = Math.max(0.6, Math.min(2.5, separationFactor));
+  const cakeScale = isExploded ? Math.min(scale, 0.88 / sep) : scale;
 
-  // Generate procedural texture for the top red traditional stamp
-  const stampTexture = useMemo(() => {
-    const canvas = document.createElement('canvas');
-    canvas.width = 512;
-    canvas.height = 512;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return null;
+  // ---------------------------------------------------------------------
+  // 1. ORGANIC PROPORTIONAL PROFILE (BÁNH PÍA TRÒN DẸT HOÀNG KIM)
+  // ---------------------------------------------------------------------
+  const {
+    outerProfilePoints,
+    innerFillingPoints,
+    crustThicknessBorderShape,
+    fillingCutShape,
+  } = useMemo(() => {
+    // Outer Shell Profile (Lathe X = radius, Y = height)
+    // Dáng bánh tròn dẹt, eo cong mềm mại, đỉnh nắp vòm êm, đáy phẳng tự nhiên
+    const rawOuter = [
+      new THREE.Vector2(0.001, -0.38), // Tâm đáy phẳng
+      new THREE.Vector2(1.05, -0.38),  // Độ rộng đáy
+      new THREE.Vector2(1.36, -0.33),  // Góc bo dưới
+      new THREE.Vector2(1.54, -0.15),  // Má dưới
+      new THREE.Vector2(1.60, 0.05),   // Vòng eo phồng đẫy đà
+      new THREE.Vector2(1.52, 0.25),   // Thu nhẹ lên vai
+      new THREE.Vector2(1.32, 0.38),   // Vai bánh cong mềm
+      new THREE.Vector2(0.85, 0.47),   // Nắp vòm êm ái
+      new THREE.Vector2(0.001, 0.50),  // Đỉnh trung tâm
+    ];
+    const outerCurve = new THREE.SplineCurve(rawOuter);
+    const outerProfile = outerCurve.getPoints(48);
 
-    ctx.clearRect(0, 0, 512, 512);
+    // Inner Filling Profile (~65% thể tích, vỏ dày ~12%)
+    const rawInner = [
+      new THREE.Vector2(0.001, -0.30),
+      new THREE.Vector2(0.90, -0.30),
+      new THREE.Vector2(1.20, -0.26),
+      new THREE.Vector2(1.36, -0.12),
+      new THREE.Vector2(1.40, 0.04),
+      new THREE.Vector2(1.34, 0.20),
+      new THREE.Vector2(1.18, 0.31),
+      new THREE.Vector2(0.72, 0.39),
+      new THREE.Vector2(0.001, 0.41),
+    ];
+    const innerCurve = new THREE.SplineCurve(rawInner);
+    const innerProfile = innerCurve.getPoints(36);
 
-    // Outer double circle stamp ring in vermilion red
-    ctx.strokeStyle = '#B71C1C';
-    ctx.lineWidth = 14;
-    ctx.beginPath();
-    ctx.arc(256, 256, 200, 0, Math.PI * 2);
-    ctx.stroke();
-
-    ctx.lineWidth = 6;
-    ctx.beginPath();
-    ctx.arc(256, 256, 175, 0, Math.PI * 2);
-    ctx.stroke();
-
-    // Chinese/Vietnamese traditional stamp character
-    ctx.fillStyle = '#B71C1C';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.font = 'bold 150px "Cinzel", "Playfair Display", "Times New Roman", serif';
-    ctx.fillText(stampText, 256, 256);
-
-    // Decorative dots
-    for (let angle = 0; angle < Math.PI * 2; angle += Math.PI / 4) {
-      const x = 256 + Math.cos(angle) * 188;
-      const y = 256 + Math.sin(angle) * 188;
-      ctx.beginPath();
-      ctx.arc(x, y, 4, 0, Math.PI * 2);
-      ctx.fill();
+    // 2D Shapes trên mặt phẳng XY cho mặt cắt:
+    // Hình thịt bánh (nhân)
+    const innerShape = new THREE.Shape();
+    innerShape.moveTo(0, innerProfile[0].y);
+    for (let i = 0; i < innerProfile.length; i++) {
+      innerShape.lineTo(innerProfile[i].x, innerProfile[i].y);
     }
-
-    const texture = new THREE.CanvasTexture(canvas);
-    texture.anisotropy = 4;
-    return texture;
-  }, [stampText]);
-
-  // Procedural bump map for flaky crust texture
-  const flakyCrustBump = useMemo(() => {
-    const canvas = document.createElement('canvas');
-    canvas.width = 256;
-    canvas.height = 256;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return null;
-
-    ctx.fillStyle = '#808080';
-    ctx.fillRect(0, 0, 256, 256);
-
-    // Horizontal layered rings
-    for (let y = 0; y < 256; y += 8) {
-      const val = Math.floor(128 + (Math.sin(y * 0.4) * 40));
-      ctx.fillStyle = `rgb(${val},${val},${val})`;
-      ctx.fillRect(0, y, 256, 4);
+    for (let i = innerProfile.length - 1; i >= 0; i--) {
+      innerShape.lineTo(-innerProfile[i].x, innerProfile[i].y);
     }
+    innerShape.closePath();
 
-    const tex = new THREE.CanvasTexture(canvas);
-    tex.wrapS = THREE.RepeatWrapping;
-    tex.wrapT = THREE.RepeatWrapping;
-    tex.repeat.set(2, 4);
-    return tex;
+    // Hình viền vỏ bánh (vỏ ngoài có lỗ rỗng nhân)
+    const borderShape = new THREE.Shape();
+    borderShape.moveTo(0, outerProfile[0].y);
+    for (let i = 0; i < outerProfile.length; i++) {
+      borderShape.lineTo(outerProfile[i].x, outerProfile[i].y);
+    }
+    for (let i = outerProfile.length - 1; i >= 0; i--) {
+      borderShape.lineTo(-outerProfile[i].x, outerProfile[i].y);
+    }
+    borderShape.closePath();
+
+    // Lỗ rỗng cho khối thịt bánh
+    const holePath = new THREE.Path();
+    holePath.moveTo(0, innerProfile[0].y);
+    for (let i = 0; i < innerProfile.length; i++) {
+      holePath.lineTo(innerProfile[i].x, innerProfile[i].y);
+    }
+    for (let i = innerProfile.length - 1; i >= 0; i--) {
+      holePath.lineTo(-innerProfile[i].x, innerProfile[i].y);
+    }
+    holePath.closePath();
+    borderShape.holes.push(holePath);
+
+    return {
+      outerProfilePoints: outerProfile,
+      innerFillingPoints: innerProfile,
+      crustThicknessBorderShape: borderShape,
+      fillingCutShape: innerShape,
+    };
   }, []);
 
+  // ---------------------------------------------------------------------
+  // 2. TEXTURES
+  // ---------------------------------------------------------------------
+  const stampTexture = useMemo(() => getArtisanStampTexture(stampText), [stampText]);
+  const embossTexture = useMemo(() => getTraditionalEmbossTexture(), []);
+
+  // ---------------------------------------------------------------------
+  // 3. PBR MATERIALS
+  // ---------------------------------------------------------------------
+  // Tầng 1: Lưới vàng kim Hologram phát quang
+  const wireframeMaterial = useMemo(() => {
+    return new THREE.MeshStandardMaterial({
+      color: '#F59E0B',
+      wireframe: true,
+      transparent: true,
+      opacity: 0.85,
+      emissive: '#D97706',
+      emissiveIntensity: 0.5,
+      roughness: 0.25,
+    });
+  }, []);
+
+  // Tầng 2: Vỏ nướng quét lòng đỏ bóng bẩy
+  const crustMaterial = useMemo(() => {
+    return new THREE.MeshPhysicalMaterial({
+      color: crustColor,
+      roughness: 0.32,
+      metalness: 0.03,
+      clearcoat: 0.65,
+      clearcoatRoughness: 0.22,
+      sheen: 0.35,
+      sheenColor: new THREE.Color('#FFF8E7'),
+      side: THREE.DoubleSide,
+    });
+  }, [crustColor]);
+
+  // Tầng 3: Thịt bánh sên mịn dẻo
+  const fillingMaterial = useMemo(() => {
+    return new THREE.MeshPhysicalMaterial({
+      color: fillingColor,
+      roughness: 0.45,
+      metalness: 0.02,
+      clearcoat: 0.25,
+      clearcoatRoughness: 0.30,
+      side: THREE.DoubleSide,
+    });
+  }, [fillingColor]);
+
+  // ---------------------------------------------------------------------
+  // 4. ANIMATION FRAME LOOP
+  // ---------------------------------------------------------------------
   useFrame((state, delta) => {
-    if (!cakeGroupRef.current) return;
+    if (!rootGroupRef.current) return;
 
-    // Levitation floating effect
     const t = state.clock.getElapsedTime();
-    cakeGroupRef.current.position.y = Math.sin(t * 1.5) * 0.08;
 
-    // Auto slow rotation if enabled
-    if (autoRotate && !isExploded) {
-      cakeGroupRef.current.rotation.y += delta * 0.35;
+    // Gentle levitation floating
+    rootGroupRef.current.position.y = Math.sin(t * 1.4) * 0.045;
+
+    // Căn mặt cắt về phía camera ban đầu khi chuyển chế độ.
+    if (isCutaway) {
+      rootGroupRef.current.rotation.y = 0;
+    } else if (autoRotate && !isExploded) {
+      rootGroupRef.current.rotation.y += delta * 0.28;
     }
 
-    // Interactive mouse damping
-    if (interactive) {
-      pointerTarget.current.x = state.pointer.x * 0.45;
-      pointerTarget.current.y = -state.pointer.y * 0.3;
+    // Giảm độ nghiêng khi tách lớp để nhìn thấy tầng nhân và lõi bên dưới.
+    if (isExploded || interactive) {
+      pointerTarget.current.x = state.pointer.x * 0.42;
+      pointerTarget.current.y = -state.pointer.y * 0.26;
 
-      cakeGroupRef.current.rotation.x = THREE.MathUtils.damp(
-        cakeGroupRef.current.rotation.x,
-        pointerTarget.current.y + 0.35, // default viewing tilt down
-        4,
+      rootGroupRef.current.rotation.x = THREE.MathUtils.damp(
+        rootGroupRef.current.rotation.x,
+        isExploded ? -0.35 : pointerTarget.current.y + 0.32,
+        4.0,
         delta
       );
     }
 
-    // Molten core pulsing glow
-    if (coreRef.current) {
-      const pulse = 1 + Math.sin(t * 3) * 0.03;
-      coreRef.current.scale.set(pulse, pulse, pulse);
+    // Tầng 1: Lưới toàn bánh (Cao nhất)
+    if (tier1WireframeRef.current) {
+      const targetY = isExploded ? 1.40 * sep : 0;
+      tier1WireframeRef.current.position.y = THREE.MathUtils.damp(
+        tier1WireframeRef.current.position.y,
+        targetY,
+        5.0,
+        delta
+      );
+      if (isExploded) {
+        tier1WireframeRef.current.rotation.y += delta * 0.25;
+      }
+    }
+
+    // Tầng 2: Vỏ bánh
+    if (tier2CrustRef.current) {
+      const targetY = isExploded ? 0.48 * sep : 0;
+      tier2CrustRef.current.position.y = THREE.MathUtils.damp(
+        tier2CrustRef.current.position.y,
+        targetY,
+        5.0,
+        delta
+      );
+    }
+
+    // Tầng 3: Thịt bánh
+    if (tier3PasteRef.current) {
+      const targetY = isExploded ? -0.42 * sep : 0;
+      tier3PasteRef.current.position.y = THREE.MathUtils.damp(
+        tier3PasteRef.current.position.y,
+        targetY,
+        5.0,
+        delta
+      );
+    }
+
+    // Tầng 4: Nhân bánh (Dưới cùng)
+    if (tier4CoreRef.current) {
+      const targetY = isExploded ? -1.35 * sep : 0;
+      tier4CoreRef.current.position.y = THREE.MathUtils.damp(
+        tier4CoreRef.current.position.y,
+        targetY,
+        5.0,
+        delta
+      );
     }
   });
 
   return (
     <group
-      ref={cakeGroupRef}
-      scale={scale}
+      ref={rootGroupRef}
+      scale={cakeScale}
       onPointerOver={() => onHover?.(true)}
       onPointerOut={() => onHover?.(false)}
     >
       {/* 
-        WHOLE CAKE OR CUTAWAY BACK HALF
+        =================================================================
+        1. NGUYÊN CHIẾC BÁNH (Khi không bổ đôi và không tách lớp)
+        =================================================================
       */}
-      {!isCutaway ? (
-        // Complete Intact Bánh Pía
+      {!isCutaway && !isExploded && (
         <group>
-          {/* Main Rounded Cake Body */}
-          <mesh castShadow receiveShadow position={[0, 0, 0]}>
-            <cylinderGeometry args={[1.5, 1.45, 0.9, 48, 12]} />
-            <meshStandardMaterial
-              color={crustColor}
-              roughness={0.48}
-              metalness={0.12}
-              bumpMap={flakyCrustBump || undefined}
-              bumpScale={0.03}
-            />
+          {/* Vỏ bánh nguyên khối */}
+          <mesh castShadow receiveShadow>
+            <latheGeometry args={[outerProfilePoints, 64]} />
+            <primitive object={crustMaterial} attach="material" />
           </mesh>
 
-          {/* Domed Top Crust */}
-          <mesh castShadow position={[0, 0.45, 0]}>
-            <sphereGeometry args={[1.5, 48, 24, 0, Math.PI * 2, 0, Math.PI * 0.3]} />
-            <meshStandardMaterial
-              color={crustColor}
-              roughness={0.42}
-              metalness={0.15}
-            />
-          </mesh>
-
-          {/* Bottom Rounded Base */}
-          <mesh receiveShadow position={[0, -0.45, 0]}>
-            <sphereGeometry args={[1.45, 36, 16, 0, Math.PI * 2, Math.PI * 0.7, Math.PI * 0.3]} />
-            <meshStandardMaterial
-              color={crustColor}
-              roughness={0.6}
-              metalness={0.05}
-            />
-          </mesh>
-
-          {/* Top Traditional Red Seal Stamp */}
-          <mesh position={[0, 0.75, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-            <planeGeometry args={[1.2, 1.2]} />
-            <meshStandardMaterial
-              map={stampTexture || undefined}
-              transparent
-              opacity={0.88}
-              roughness={0.3}
-              depthWrite={false}
-            />
-          </mesh>
-
-          {/* Toasted Golden Egg Wash Center Highlight */}
-          <mesh position={[0, 0.74, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-            <circleGeometry args={[1.1, 32]} />
-            <meshBasicMaterial
-              color="#A0522D"
-              transparent
-              opacity={0.18}
-              blending={THREE.MultiplyBlending}
-            />
-          </mesh>
-        </group>
-      ) : (
-        // CUTAWAY CROSS-SECTION VIEW (Showing internal culinary architecture!)
-        <group>
-          {/* Back half: Outer crust */}
-          <mesh position={[0, 0, 0]}>
-            <cylinderGeometry args={[1.5, 1.45, 0.9, 36, 8, false, Math.PI, Math.PI]} />
-            <meshStandardMaterial
-              color={crustColor}
-              roughness={0.5}
-              bumpMap={flakyCrustBump || undefined}
-              bumpScale={0.03}
-            />
-          </mesh>
-
-          {/* Back half: Top dome */}
-          <mesh position={[0, 0.45, 0]}>
-            <sphereGeometry args={[1.5, 36, 16, Math.PI, Math.PI, 0, Math.PI * 0.3]} />
-            <meshStandardMaterial color={crustColor} roughness={0.45} />
-          </mesh>
-
-          {/* Cross-section cut surface (Flat exposed face) */}
-          {/* Layer 1: Outer Flaky Pastry Border */}
-          <mesh position={[0, 0, 0]}>
-            <boxGeometry args={[3.0, 0.9, 0.05]} />
-            <meshStandardMaterial
-              color={crustColor}
-              roughness={0.7}
-              bumpMap={flakyCrustBump || undefined}
-              bumpScale={0.08}
-            />
-          </mesh>
-
-          {/* Layer 2: Velvety Filling Core (Durian / Taro / Matcha paste) */}
-          <mesh
-            position={[0, 0, isExploded ? 0.4 : 0.02]}
-            castShadow
-          >
-            <cylinderGeometry args={[1.32, 1.3, 0.78, 32, 4, false, Math.PI, Math.PI]} />
-            <meshStandardMaterial
-              color={fillingColor}
-              roughness={0.35}
-              metalness={0.08}
-            />
-          </mesh>
-
-          {/* Layer 3: Central Molten Golden Yolk / Lava Core */}
-          <mesh
-            ref={coreRef}
-            position={[0, 0, isExploded ? 0.8 : 0.06]}
-            castShadow
-          >
-            <sphereGeometry args={[0.55, 32, 32]} />
-            <meshStandardMaterial
-              color={coreColor}
-              emissive={coreColor}
-              emissiveIntensity={0.65}
-              roughness={0.2}
-              metalness={0.3}
-            />
-          </mesh>
-
-          {/* Dripping Lava Liquid Beads */}
-          <mesh position={[0, -0.32, isExploded ? 0.8 : 0.08]}>
-            <sphereGeometry args={[0.18, 16, 16]} />
-            <meshStandardMaterial
-              color={coreColor}
-              emissive={coreColor}
-              emissiveIntensity={0.7}
-              roughness={0.15}
-            />
-          </mesh>
-          <mesh position={[0.22, -0.42, isExploded ? 0.8 : 0.08]}>
-            <sphereGeometry args={[0.12, 16, 16]} />
-            <meshStandardMaterial
-              color={coreColor}
-              emissive={coreColor}
-              emissiveIntensity={0.7}
-              roughness={0.15}
-            />
-          </mesh>
-
-          {/* Cutaway front half pushed forward when exploded */}
-          {isExploded && (
-            <group position={[0, 0, 1.2]}>
-              <mesh position={[0, 0, 0]}>
-                <cylinderGeometry args={[1.5, 1.45, 0.9, 36, 8, false, 0, Math.PI]} />
-                <meshStandardMaterial
-                  color={crustColor}
-                  roughness={0.5}
-                  wireframe
-                />
-              </mesh>
-            </group>
+          {/* Dấu mộc son đỏ / Hoa văn truyền thống */}
+          {cakeType === 'traditional' ? (
+            <mesh position={[0, 0.499, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+              <circleGeometry args={[1.05, 48]} />
+              <meshStandardMaterial
+                bumpMap={embossTexture}
+                bumpScale={0.08}
+                color={crustColor}
+                roughness={0.34}
+                transparent
+                opacity={0.96}
+              />
+            </mesh>
+          ) : (
+            <mesh position={[0, 0.501, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+              <circleGeometry args={[0.72, 48]} />
+              <meshBasicMaterial
+                map={stampTexture}
+                transparent
+                opacity={0.94}
+                toneMapped={false}
+                depthWrite={false}
+              />
+            </mesh>
           )}
+        </group>
+      )}
 
-          {/* Half Stamp on remaining back dome */}
-          <mesh position={[0, 0.75, -0.2]} rotation={[-Math.PI / 2, 0, 0]}>
-            <planeGeometry args={[1.2, 0.6]} />
-            <meshStandardMaterial
-              map={stampTexture || undefined}
+      {/*
+        =================================================================
+        2. BỔ ĐÔI BÁNH: CẮT ĐÔI BÁNH THẬT - PHẲNG MỊN & RÕ TẦNG NHÂN
+        (Không nhét vật lạ, phẳng hoàn toàn như dao cắt thật)
+        =================================================================
+      */}
+      {isCutaway && !isExploded && (
+        <group>
+          {/* Nửa vòm cong phía sau (Z <= 0) */}
+          <mesh castShadow receiveShadow>
+            <latheGeometry args={[outerProfilePoints, 48, Math.PI / 2, Math.PI]} />
+            <primitive object={crustMaterial} attach="material" />
+          </mesh>
+
+          {/* Mặt cắt viền vỏ bánh nướng vàng (Phẳng hoàn toàn tại Z = 0) */}
+          <mesh position={[0, 0, 0.001]} receiveShadow>
+            <shapeGeometry args={[crustThicknessBorderShape]} />
+            <primitive object={crustMaterial} attach="material" />
+          </mesh>
+
+          {/* Mặt cắt thịt bánh sên mịn (Phẳng hoàn toàn tại Z = 0.002) */}
+          <mesh position={[0, 0, 0.002]} receiveShadow>
+            <shapeGeometry args={[fillingCutShape]} />
+            <primitive object={fillingMaterial} attach="material" />
+          </mesh>
+
+          {/* Mặt cắt tròn của lõi bánh */}
+          <mesh position={[0, 0.04, 0.003]}>
+            <circleGeometry args={[0.32, 48]} />
+            <meshBasicMaterial color={coreColor} toneMapped={false} />
+          </mesh>
+
+          {/* Nửa dấu mộc son trên nắp vòm bán cầu (Z <= 0) */}
+          <mesh position={[0, 0.501, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+            <circleGeometry args={[0.72, 36, 0, Math.PI]} />
+            <meshBasicMaterial
+              map={stampTexture}
               transparent
-              opacity={0.9}
-              roughness={0.3}
+              opacity={0.94}
+              toneMapped={false}
+              depthWrite={false}
             />
           </mesh>
         </group>
       )}
 
-      {/* Warm Point Light radiating from the cake */}
+      {/*
+        =================================================================
+        3. TÁCH LỚP 3D: CÁC TẦNG CÁCH XA NHAU TỪ TRÊN XUỐNG DƯỚI
+        - TẦNG 1: TOÀN BỘ CÁI BÁNH DẠNG LƯỚI
+        - TẦNG 2: VỎ BÁNH
+        - TẦNG 3: THỊT BÁNH
+        - TẦNG 4: NHÂN BÁNH
+        (Có thể dùng chuột kéo dãn khoảng cách)
+        =================================================================
+      */}
+      {isExploded && (
+        <group>
+          {/* -------------------------------------------------------------
+              TẦNG 1 (TRÊN CÙNG): TOÀN BỘ CÁI BÁNH DẠNG LƯỚI
+          ------------------------------------------------------------- */}
+          <group ref={tier1WireframeRef}>
+            <mesh>
+              <latheGeometry args={[outerProfilePoints, 32]} />
+              <primitive object={wireframeMaterial} attach="material" />
+            </mesh>
+            <Html position={[1.65, 0.05, 0]} center pointerEvents="none" zIndexRange={[10, 0]}>
+              <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-pia-charcoal/90 backdrop-blur-md border border-pia-gold/50 text-[11px] font-bold text-pia-gold shadow-xl tracking-wide select-none whitespace-nowrap">
+                <span className="w-2 h-2 rounded-full bg-pia-gold animate-pulse" />
+                <span>TẦNG 1 · TOÀN BÁNH</span>
+              </div>
+            </Html>
+          </group>
+
+          {/* -------------------------------------------------------------
+              TẦNG 2: VỎ BÁNH (18 VI TẦNG HOÀNG KIM)
+          ------------------------------------------------------------- */}
+          <group ref={tier2CrustRef}>
+            <mesh castShadow receiveShadow>
+              <latheGeometry args={[outerProfilePoints, 64]} />
+              <primitive object={crustMaterial} attach="material" />
+            </mesh>
+            {/* Mộc son đỏ trên nắp vỏ */}
+            <mesh position={[0, 0.501, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+              <circleGeometry args={[0.72, 48]} />
+              <meshBasicMaterial
+                map={stampTexture}
+                transparent
+                opacity={0.94}
+                toneMapped={false}
+                depthWrite={false}
+              />
+            </mesh>
+            {/* Vòng hào quang vàng kim vi tầng */}
+            {[-0.08, 0.08, 0.22].map((yOffset, idx) => (
+              <mesh key={idx} position={[0, yOffset, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+                <ringGeometry args={[1.56 + idx * 0.02, 1.59 + idx * 0.02, 48]} />
+                <meshBasicMaterial
+                  color="#F59E0B"
+                  transparent
+                  opacity={0.45}
+                  side={THREE.DoubleSide}
+                />
+              </mesh>
+            ))}
+            <Html position={[1.65, 0.05, 0]} center pointerEvents="none" zIndexRange={[10, 0]}>
+              <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-pia-charcoal/90 backdrop-blur-md border border-amber-500/50 text-[11px] font-bold text-amber-300 shadow-xl tracking-wide select-none whitespace-nowrap">
+                <span className="w-2 h-2 rounded-full bg-amber-400" />
+                <span>TẦNG 2 · VỎ BÁNH</span>
+              </div>
+            </Html>
+          </group>
+
+          {/* -------------------------------------------------------------
+              TẦNG 3: THỊT BÁNH (KHỐI NHÂN ĐẬU XANH/SẦU RIÊNG SÊN MỊN)
+          ------------------------------------------------------------- */}
+          <group ref={tier3PasteRef}>
+            <mesh castShadow receiveShadow>
+              <latheGeometry args={[innerFillingPoints, 48]} />
+              <primitive object={fillingMaterial} attach="material" />
+            </mesh>
+            <Html position={[1.65, 0.05, 0]} center pointerEvents="none" zIndexRange={[10, 0]}>
+              <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-pia-charcoal/90 backdrop-blur-md border border-yellow-500/50 text-[11px] font-bold text-yellow-200 shadow-xl tracking-wide select-none whitespace-nowrap">
+                <span className="w-2 h-2 rounded-full bg-yellow-400" />
+                <span>TẦNG 3 · NHÂN SÊN</span>
+              </div>
+            </Html>
+          </group>
+
+          {/* -------------------------------------------------------------
+              TẦNG 4 (DƯỚI CÙNG): LÕI BÁNH
+          ------------------------------------------------------------- */}
+          <group ref={tier4CoreRef} position={[0, 0.04, 0]}>
+            <mesh castShadow>
+              <sphereGeometry args={[0.56, 36, 32]} />
+              <meshStandardMaterial color={coreColor} roughness={0.7} />
+            </mesh>
+            <Html position={[1.65, 0.05, 0]} center pointerEvents="none" zIndexRange={[10, 0]}>
+              <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-pia-charcoal/90 backdrop-blur-md border border-orange-500/50 text-[11px] font-bold text-orange-300 shadow-xl tracking-wide select-none whitespace-nowrap">
+                <span className="w-2 h-2 rounded-full bg-orange-500" />
+                <span>TẦNG 4 · LÕI BÁNH</span>
+              </div>
+            </Html>
+          </group>
+        </group>
+      )}
+
+      {/* Warm fill light */}
       <pointLight
-        color={coreColor}
-        intensity={0.8}
+        color="#FF5722"
+        intensity={0.45}
         distance={3.5}
         decay={2}
-        position={[0, 0.2, 0.5]}
+        position={[0, 0.1, 0.5]}
       />
     </group>
   );

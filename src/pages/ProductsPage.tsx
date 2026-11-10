@@ -216,6 +216,7 @@ export function ProductsPage({ onAddToCart, onNavigate }: ProductsPageProps) {
                   fillingColor={inspectionProduct.layers.filling.color}
                   coreColor={inspectionProduct.layers.core.color}
                   stampText={inspectionProduct.layers.stamp.charAt(inspectionProduct.layers.stamp.indexOf('"') + 1) || '福'}
+                  cakeType={inspectionProduct.category === 'hop-qua-trung-thu' ? 'traditional' : 'pia'}
                   isCutaway={modalCutaway}
                   scale={1.15}
                 />

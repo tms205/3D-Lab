@@ -60,7 +60,7 @@ export function PiaCanvas({
   children,
   className = 'w-full h-full min-h-[420px]',
   enableOrbit = true,
-  cameraPosition = [0, 1.8, 4.6],
+  cameraPosition = [0, 1.4, 4.4],
   fov = 42,
   showShadows = true,
 }: PiaCanvasProps) {
@@ -68,8 +68,9 @@ export function PiaCanvas({
     <WebGLErrorBoundary>
       <div className={`relative ${className}`}>
         <Canvas
+          shadows
           camera={{ position: cameraPosition, fov }}
-          dpr={[1, 2]} // Performance: limit max DPR to 2 to prevent mobile stutter
+          dpr={[1, 2]} // Performance: limit max DPR to 2
           gl={{
             antialias: true,
             alpha: true,
@@ -77,37 +78,60 @@ export function PiaCanvas({
           }}
           className="w-full h-full"
         >
-          <ambientLight intensity={0.85} />
+          {/* ========================================================
+              STUDIO FOOD PHOTOGRAPHY LIGHTING SETUP
+          ======================================================== */}
+          {/* Warm Ambient Base */}
+          <ambientLight intensity={0.65} color="#FFF8E7" />
+
+          {/* Key Light: Warm golden morning sun casting crisp soft shadows */}
           <directionalLight
-            position={[5, 8, 5]}
-            intensity={1.6}
+            position={[4, 6, 4]}
+            intensity={2.2}
             color="#FFF4D6"
             castShadow
+            shadow-mapSize={[1024, 1024]}
+            shadow-bias={-0.0001}
           />
+
+          {/* Fill Light: Soft terracotta warmth on shadowed side */}
           <directionalLight
-            position={[-5, 3, -3]}
-            intensity={0.6}
-            color="#FFAB91"
+            position={[-4, 3, 2]}
+            intensity={0.85}
+            color="#FFCC80"
           />
-          <pointLight position={[0, -2, 2]} intensity={0.4} color="#E5A93C" />
+
+          {/* Golden Rim Backlight: Highlights pastry silhouette and flaky edges */}
+          <directionalLight
+            position={[0, 4, -4.5]}
+            intensity={2.0}
+            color="#FFE082"
+          />
+
+          {/* Floor Bounce Light: Simulates warm reflections from serving tray */}
+          <pointLight
+            position={[0, -2, 2]}
+            intensity={0.5}
+            color="#E5A93C"
+          />
 
           <Suspense fallback={null}>
             <Float
-              speed={1.6}
-              rotationIntensity={0.2}
-              floatIntensity={0.3}
+              speed={1.4}
+              rotationIntensity={0.15}
+              floatIntensity={0.25}
             >
               {children}
             </Float>
 
             {showShadows && (
               <ContactShadows
-                position={[0, -1.2, 0]}
-                opacity={0.55}
-                scale={5}
-                blur={2.4}
-                far={3}
-                color="#000000"
+                position={[0, -0.65, 0]}
+                opacity={0.65}
+                scale={5.5}
+                blur={2.0}
+                far={2.5}
+                color="#0D0704"
               />
             )}
           </Suspense>
@@ -116,19 +140,19 @@ export function PiaCanvas({
             <OrbitControls
               enablePan={false}
               enableZoom={true}
-              minDistance={2.8}
-              maxDistance={7.5}
-              minPolarAngle={Math.PI / 4}
-              maxPolarAngle={Math.PI / 1.8}
+              minDistance={2.6}
+              maxDistance={7.0}
+              minPolarAngle={Math.PI / 6}
+              maxPolarAngle={Math.PI / 1.85}
               dampingFactor={0.06}
             />
           )}
         </Canvas>
 
         {/* 3D Interaction Badge */}
-        <div className="absolute bottom-3 left-4 pointer-events-none flex items-center gap-1.5 px-3 py-1 rounded-full bg-pia-charcoal/70 backdrop-blur-md border border-pia-gold/20 text-[11px] text-pia-goldLight">
+        <div className="absolute bottom-3 left-4 pointer-events-none flex items-center gap-1.5 px-3 py-1 rounded-full bg-pia-charcoal/80 backdrop-blur-md border border-pia-gold/30 text-[11px] text-pia-goldLight shadow-lg">
           <Sparkles className="w-3.5 h-3.5 text-pia-gold animate-spin-slow" />
-          <span>Kéo xoay 360° • Cuộn để phóng to</span>
+          <span>Xoay 360° • Cuộn phóng to • Bấm bổ đôi bánh</span>
         </div>
       </div>
     </WebGLErrorBoundary>
